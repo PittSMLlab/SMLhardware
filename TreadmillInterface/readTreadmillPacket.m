@@ -1,40 +1,30 @@
 function [cur_speedR,cur_speedL,cur_incl] = readTreadmillPacket(t)
 %readTreadmillPacket reads in a packet from the treadmill, 32 bytes long,
-%and parses out the belt speeds and incline angle. Note, accelerations are
-%not available
-%   
-% disp(get(t,'BytesAvailable'))
+%and parses out the belt speeds and incline angle.
+%disp(get(t,'BytesAvailable'))
 
-%read through the buffer to get fresh data (throw away chunks of 32 bytes)
-while(get(t,'BytesAvailable')>1)
-    fread(t,32);
+%First: read through the buffer to get freshest data (throw away chunks of 32 bytes)
+while~(get(t,'BytesAvailable')>1)
+    %nop: wait until data is available
 end
+while(get(t,'BytesAvailable')>1)
+    %disp(get(t,'BytesAvailable')) %This returns 32 or 0
+    fread(t,1,'uint8'); %format byte
+    speeds=fread(t,4,'int16');
+    cur_incl=fread(t,1,'int16');
+    fread(t,21,'uint8'); %21 padding bytes (should be all 0)
+    pause(.025); %This pause is needed because the treadmill interface 
+    %reports no data available for a short time after a read, even if the buffer is not truly empty
+    %Since true samples come at a rate of about 15Hz, this eventually
+    %depletes the buffer, at the cost of adding 25ms of processing to each
+    %read of the buffer.
+end
+%We exit the loop once there is no data available even after waiting 25ms
+%This suggests the last packet read is the last packet available
+%We don't wait until a new one comes in, to avoid unnecessary waits
 
-
-
-%INCORRECT WAY OF DOING IT: because decimalToBinary doesn't consider signs. -Pablo, 4/30/2015
-% %read 32 bytes (latest data)
-% packet = fread(t,32);
-% 
-% %convert back to binary to re-assess what the real value is: (Pablo, 4/30/2015: why are we doing this? How is the int16 conversion wrong?)
-% cur_speedR = [decimalToBinaryVector(packet(2),8) decimalToBinaryVector(packet(3),8)];
-% cur_speedR = binaryVectorToDecimal(cur_speedR);
-% 
-% cur_speedL = [decimalToBinaryVector(packet(4),8) decimalToBinaryVector(packet(5),8)];
-% cur_speedL = binaryVectorToDecimal(cur_speedL);
-% 
-% cur_incl = [decimalToBinaryVector(packet(10),8) decimalToBinaryVector(packet(11),8)];
-% cur_incl = binaryVectorToDecimal(cur_incl); %
-
-
-%CORRECT WAY: -Pablo 4/30/2015
-%Will, you stated that this was incorrect. why? This was working before and seems to match Bertec's comm specifications) method of converting bytes
-read_format=fread(t,1,'uint8');
-speeds=fread(t,4,'int16');
 cur_speedR=speeds(1);
 cur_speedL=speeds(2);
-cur_incl=fread(t,1,'int16');
-padding=fread(t,21,'uint8');
 
 end
 
